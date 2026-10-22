@@ -29,6 +29,8 @@ Drizzle ORM ── Postgres: users, documents, document_shares
 
 **Autosave that does not lose the last keystrokes.** Saves are debounced (800 ms) and serialized, never two at once. Edits made during a save trigger a follow-up save. Network and 5xx errors retry after 5 s while the document is open. Every way out of the editor sends pending edits first: in-app links and Sign out wait for the save, browser Back and Forward save on unmount, and leaving the site sends a `keepalive` request (the browser's "leave site?" prompt remains the safety net for documents over the 64 KB keepalive limit). If a save cannot succeed (for example access was revoked), leaving asks for confirmation instead of silently blocking. Pages restored from the browser history refresh themselves, so a stale copy never triggers a false conflict, and "Load their version" remounts the editor, so undo cannot bring back the overwritten text.
 
+**Export rendered on the server.** `GET /api/documents/:id/export?format=pdf|md` uses the same `view` permission as reading. Markdown comes from Tiptap's own serializer, configured with the shared editor schema; underline is written as `<u>` because Markdown has no underline syntax, which keeps exports portable and lets them re-import losslessly. PDF is laid out by a small renderer on top of `pdf-lib` (pure JavaScript, so it runs in a normal Vercel function): headings, marks, nested lists, quotes, code and page numbers, with real selectable text. Fonts are Noto Sans, so accented, Greek and Cyrillic text renders. `pdf-lib`'s built-in font subsetting dropped glyphs from these fonts, so each font is first trimmed to the document's characters with HarfBuzz (`subset-font`), keeping a typical PDF under 100 KB.
+
 **Mocked auth with real enforcement.** The assignment allows simulated users, so login is a picker over three seeded accounts. The session is still an HS256-signed JWT in an httpOnly, SameSite=Lax cookie, and every API call resolves the user on the server. Replacing the picker with real authentication would not touch the access layer.
 
 **File import as "new document".** `.txt`, `.md` (via `marked`) and `.docx` (via `mammoth`) are converted to HTML, then into the editor schema on the server. The upload limit is 4 MB because Vercel rejects function request bodies above 4.5 MB. It is checked in the browser for fast feedback and enforced on the server. The converted document must also pass the same validation as a normal save, so an import can never create a document that is too large to save.
@@ -41,12 +43,12 @@ Drizzle ORM ── Postgres: users, documents, document_shares
 
 - **Real-time co-editing** (CRDT or OT, live cursors). Vercel functions cannot hold WebSockets, so this would need a third-party realtime service. It was the highest-risk item for the timebox. The conflict guard covers the data-loss risk instead.
 - **Real sign-up and passwords, share by email invite, public links.** Seeded users exercise the same access logic.
-- **Comments, suggestions, version history, export, images and tables, attachments.**
+- **Comments, suggestions, version history, `.docx` export, images and tables, attachments.**
 
 ## What I would build next (2 to 4 hours)
 
 1. Version history: keep the previous content on each save (cheap with the existing version column) and let owners restore it.
 2. Live presence and update notifications by polling `version` every few seconds, so editors learn about changes before they conflict.
-3. Export to `.docx` and Markdown, the reverse of the import pipeline.
+3. Export to `.docx`, and emoji in PDFs by adding an emoji font.
 4. Run the browser walkthrough (`pnpm e2e`) and the test suite in CI on every pull request.
 5. Rate limiting on the API and audit entries for share changes.

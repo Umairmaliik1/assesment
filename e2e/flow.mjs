@@ -19,6 +19,15 @@ async function session(userName) {
   await page.waitForURL(B + "/");
   return page;
 }
+async function exportAs(page, label) {
+  const download = page.waitForEvent("download");
+  await page.getByRole("button", { name: "Export" }).click();
+  await page.getByRole("menuitem", { name: label }).click();
+  const file = await download;
+  const chunks = [];
+  for await (const chunk of await file.createReadStream()) chunks.push(chunk);
+  return { name: file.suggestedFilename(), body: Buffer.concat(chunks) };
+}
 const saved = (page) => page.getByRole("status").filter({ hasText: "All changes saved" }).waitFor({ timeout: 8000 });
 
 const alice = await session("Alice");
@@ -48,6 +57,15 @@ await saved(alice);
 await alice.reload();
 const html = await alice.locator(".doc-content").innerHTML();
 check("formatting persists after reload", ["<h1>Launch plan</h1>", "<strong>bold</strong>", "<em>italic</em>", "<u>underlined</u>", "<ul>", "<ol>"].every((s) => html.includes(s)), html.slice(0, 300));
+await alice.locator(".doc-content").click();
+await alice.keyboard.press("Meta+End");
+await alice.keyboard.type(" Typed right before export.");
+const md = await exportAs(alice, "Markdown (.md)");
+const mdText = md.body.toString();
+check("markdown export downloads with the title as file name", md.name === "Q4 Launch Plan.md", md.name);
+check("markdown export keeps formatting and unsaved edits", ["# Launch plan", "**bold**", "*italic*", "<u>underlined</u>", "- First", "1. Step one", "Typed right before export."].every((s) => mdText.includes(s)), mdText.slice(0, 200));
+const pdf = await exportAs(alice, "PDF document (.pdf)");
+check("pdf export downloads a real PDF", pdf.name === "Q4 Launch Plan.pdf" && pdf.body.subarray(0, 5).toString() === "%PDF-", `${pdf.name} ${pdf.body.length} bytes`);
 check("title persists after reload", (await alice.getByLabel("Document title").inputValue()) === "Q4 Launch Plan");
 
 // Share with Bob as viewer.
@@ -70,6 +88,7 @@ check("viewer sees View only", (await bob.getByRole("status").innerText()) === "
 check("viewer has no toolbar", (await bob.getByRole("toolbar").count()) === 0);
 check("viewer editor not editable", (await bob.locator(".doc-content").getAttribute("contenteditable")) === "false");
 check("viewer has no share button", (await bob.getByRole("button", { name: "Share" }).count()) === 0);
+check("viewer can export", (await exportAs(bob, "Markdown (.md)")).body.toString().includes("# Launch plan"));
 
 // Upgrade Bob to editor, then make Alice's open tab stale.
 await alice.getByRole("button", { name: "Share", exact: true }).click();

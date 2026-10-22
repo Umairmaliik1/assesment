@@ -6,6 +6,7 @@ import { can, type Role } from "@/lib/access";
 import { extensions } from "@/lib/editor-extensions";
 import { AppHeader } from "./app-header";
 import { DeleteButton } from "./delete-button";
+import { ExportMenu } from "./export-menu";
 import { ShareDialog } from "./share-dialog";
 import { TitleField } from "./title-field";
 import { Toolbar } from "./toolbar";
@@ -47,12 +48,15 @@ export function DocumentEditor({ user, doc }: Props) {
           >
             {canEdit ? STATUS_LABEL[status] : "View only"}
           </span>
-          {isOwner && (
-            <span className="ml-auto flex shrink-0 items-center gap-1">
-              <DeleteButton docId={doc.id} />
-              <ShareDialog docId={doc.id} />
-            </span>
-          )}
+          <span className="ml-auto flex w-full shrink-0 items-center justify-end gap-1 sm:w-auto">
+            <ExportMenu docId={doc.id} />
+            {isOwner && (
+              <>
+                <DeleteButton docId={doc.id} />
+                <ShareDialog docId={doc.id} />
+              </>
+            )}
+          </span>
         </AppHeader>
 
         {canEdit && editor && (

@@ -3,6 +3,7 @@ import { beforeAll, describe, expect, it } from "vitest";
 import * as documentRoute from "@/app/api/documents/[id]/route";
 import * as shareRoute from "@/app/api/documents/[id]/shares/route";
 import * as revokeRoute from "@/app/api/documents/[id]/shares/[userId]/route";
+import * as exportRoute from "@/app/api/documents/[id]/export/route";
 import * as importRoute from "@/app/api/documents/import/route";
 import * as documentsRoute from "@/app/api/documents/route";
 import * as sessionRoute from "@/app/api/session/route";
@@ -13,7 +14,7 @@ type User = "alice" | "bob" | "carol";
 
 const tokens = {} as Record<User, string>;
 
-async function call(handler: Handler, as: User | null, init: { body?: unknown; form?: FormData; params?: Record<string, string> } = {}) {
+async function call(handler: Handler, as: User | null, init: { body?: unknown; form?: FormData; params?: Record<string, string>; method?: string; query?: string } = {}) {
   const headers = new Headers();
   if (as) headers.set("cookie", `${SESSION_COOKIE}=${tokens[as]}`);
   let body: BodyInit | undefined = init.form;
@@ -22,8 +23,9 @@ async function call(handler: Handler, as: User | null, init: { body?: unknown; f
     body = typeof init.body === "string" ? init.body : JSON.stringify(init.body);
   }
   const ctx = { params: Promise.resolve(init.params ?? {}) } as never;
-  const res = await handler(new NextRequest("http://test/api", { method: "POST", headers, body }), ctx);
-  return { status: res.status, headers: res.headers, json: res.status === 204 ? null : await res.json() };
+  const res = await handler(new NextRequest(`http://test/api${init.query ?? ""}`, { method: init.method ?? "POST", headers, body }), ctx);
+  const isJson = res.headers.get("content-type")?.includes("application/json");
+  return { status: res.status, headers: res.headers, json: isJson ? await res.json() : null, raw: isJson || res.status === 204 ? null : await res.arrayBuffer() };
 }
 
 const paragraph = (text: string) => ({ type: "doc", content: [{ type: "paragraph", content: [{ type: "text", text }] }] });
@@ -141,5 +143,32 @@ describe("import", () => {
   it("returns a clear error when no file is sent", async () => {
     const res = await call(importRoute.POST, "alice", { form: new FormData() });
     expect(res).toMatchObject({ status: 400, json: { error: "Choose a file to import" } });
+  });
+});
+
+describe("export", () => {
+  it("lets a viewer download Markdown and PDF named after the document", async () => {
+    const id = await createDoc("Q4 Plan 🚀");
+    const params = { id };
+    await call(documentRoute.PATCH, "alice", { params, body: { content: paragraph("Hello **world**"), baseVersion: 1 } });
+    await call(shareRoute.PUT, "alice", { params, body: { userId: "bob", role: "viewer" } });
+
+    const md = await call(exportRoute.GET, "bob", { params, method: "GET", query: "?format=md" });
+    expect(md.status).toBe(200);
+    expect(md.headers.get("content-type")).toBe("text/markdown; charset=utf-8");
+    expect(md.headers.get("content-disposition")).toContain("filename*=UTF-8''Q4%20Plan%20%F0%9F%9A%80.md");
+    expect(new TextDecoder().decode(md.raw!)).toBe("Hello \\*\\*world\\*\\*\n");
+
+    const pdf = await call(exportRoute.GET, "bob", { params, method: "GET", query: "?format=pdf" });
+    expect(pdf.headers.get("content-type")).toBe("application/pdf");
+    expect(new TextDecoder().decode(pdf.raw!.slice(0, 5))).toBe("%PDF-");
+  });
+
+  it("hides documents from users without access and validates the format", async () => {
+    const params = { id: await createDoc() };
+    expect((await call(exportRoute.GET, "carol", { params, method: "GET", query: "?format=pdf" })).status).toBe(404);
+    expect((await call(exportRoute.GET, null, { params, method: "GET", query: "?format=pdf" })).status).toBe(401);
+    const bad = await call(exportRoute.GET, "alice", { params, method: "GET", query: "?format=docx" });
+    expect(bad).toMatchObject({ status: 400, json: { error: "Format must be pdf or md" } });
   });
 });

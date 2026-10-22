@@ -37,11 +37,12 @@ I treated the AI as a fast pair programmer, not an autopilot. Before any code wa
   - A document deleted during a save was reported as a conflict (fixed from code reading, since the race cannot be timed reliably).
   - One was rejected after testing: the claimed import bundling problem does not occur in the production build.
   - Fixing Back exposed one more gap the review missed: leaving the site entirely skipped the save. It now sends a `keepalive` request.
+- **Export feature, checked by looking at the output:** the first PDFs passed every automated test and extracted the right text, but rendering one to an image showed most letters missing. An A/B test isolated it to `pdf-lib`'s font subsetting, so fonts are now subset with HarfBuzz first. The same visual check caught code blocks being merged onto one line, and a phone-width measurement caught the new Export button squeezing the title to 33 px.
 - **A weak test was strengthened.** Breaking the "must be a document root" validation did not fail any test, so I added a case that does.
 
 ## How I verified correctness and quality
 
-- **Tests can fail.** I deliberately broke each rule the tests guard and confirmed a test failed each time, then restored the code: an editor gaining owner rights, removing the version check, giving strangers access, removing HTML escaping, disabling content validation, and removing the import size check.
-- **End-to-end in a real browser.** A headless Chrome run with two users (`pnpm e2e`) checks 26 behaviours, including formatting persisting after reload, viewer restrictions, the conflict banner, import, revocation and deletion. The navigation save guard was A/B tested: without it, the edits typed just before leaving a page were lost.
+- **Tests can fail.** I deliberately broke each rule the tests guard and confirmed a test failed each time, then restored the code: an editor gaining owner rights, removing the version check, giving strangers access, removing HTML escaping, disabling content validation, removing the import size check, writing underline in a non-standard Markdown form, and skipping export format validation.
+- **End-to-end in a real browser.** A headless Chrome run with two users (`pnpm e2e`) checks 30 behaviours, including export downloads, formatting persisting after reload, viewer restrictions, the conflict banner, import, revocation and deletion. The navigation save guard was A/B tested: without it, the edits typed just before leaving a page were lost.
 - **Deployment risk.** I ran a clean install and build with the pnpm version Vercel uses, confirmed a missing `DATABASE_URL` on Vercel fails with a clear error, and confirmed the embedded database is not shipped in serverless bundles.
-- **Gates on every change:** typecheck, lint, 31 tests and a production build.
+- **Gates on every change:** typecheck, lint, 38 tests and a production build.

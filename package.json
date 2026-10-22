@@ -15,8 +15,11 @@
   },
   "dependencies": {
     "@neondatabase/serverless": "^1.2.0",
+    "@pdf-lib/fontkit": "1.1.1",
     "@tiptap/core": "^3.32.0",
+    "@tiptap/extension-underline": "3.32.0",
     "@tiptap/html": "^3.32.0",
+    "@tiptap/markdown": "3.32.0",
     "@tiptap/pm": "^3.32.0",
     "@tiptap/react": "^3.32.0",
     "@tiptap/starter-kit": "^3.32.0",
@@ -26,8 +29,10 @@
     "mammoth": "^1.13.0",
     "marked": "^18.1.1",
     "next": "15.5.28",
+    "pdf-lib": "1.17.1",
     "react": "19.1.0",
     "react-dom": "19.1.0",
+    "subset-font": "2.9.0",
     "zod": "^4.6.7"
   },
   "devDependencies": {
@@ -37,6 +42,7 @@
     "@types/node": "^20",
     "@types/react": "^19",
     "@types/react-dom": "^19",
+    "@types/subset-font": "^2.3.0",
     "drizzle-kit": "^0.31.11",
     "eslint": "^9",
     "eslint-config-next": "15.5.28",

@@ -1,10 +1,10 @@
 # Ajaia Docs
 
-A lightweight collaborative document editor: create and format documents in the browser, import files, and share them with other users as viewers or editors.
+A lightweight collaborative document editor: create and format documents in the browser, import and export files, and share them with other users as viewers or editors.
 
-- **Live app:** _add the Vercel URL here after deploying_
+- **Live app:** https://inkwellassesment.vercel.app
 - **Stack:** Next.js 15 (App Router, TypeScript), Tiptap editor, Postgres via Drizzle ORM, Tailwind CSS
-- **More detail:** [ARCHITECTURE.md](ARCHITECTURE.md), [AI_WORKFLOW.md](AI_WORKFLOW.md), [SUBMISSION.md](SUBMISSION.md)
+- **More detail:** [ARCHITECTURE.md](ARCHITECTURE.md), [SUBMISSION.md](SUBMISSION.md)
 
 ## Demo accounts
 
@@ -24,6 +24,7 @@ Suggested review flow: sign in as Alice, create a document and format it, share 
 - **Formatting:** bold, italic, underline, headings 1 to 3, bulleted and numbered lists, undo and redo. Markdown shortcuts such as `# ` and `- ` also work.
 - **File import:** `.txt`, `.md` and `.docx` files up to **4 MB** become a new editable document. Headings, lists and bold or italic text are kept. Images, tables and other unsupported content are dropped. Other file types are rejected with a clear message.
 - **Sharing:** the owner grants **Viewer** (read only) or **Editor** (can edit content) access, and can change or remove it. Only the owner can rename, share or delete. The dashboard separates **My documents** from **Shared with me**, with role badges and owner names.
+- **Export:** anyone who can view a document can download it as **PDF** or **Markdown** from the **Export** menu. Pending edits are saved first, so the file always matches the screen. The PDF is generated on the server with selectable text and page numbers. Markdown uses standard syntax (underline as `<u>`), so an exported file imports back without losing formatting. Emoji are left out of PDFs because the embedded font (Noto Sans) has no emoji glyphs.
 - **Conflict guard:** if someone else saved since you loaded the document, your save is rejected instead of silently overwriting theirs. You choose **Load their version** or **Keep mine and overwrite**.
 
 ## Run locally
@@ -60,11 +61,12 @@ The embedded database is single-process: stop the dev server before running `pnp
 
 ## Tests
 
-`pnpm test` runs 31 tests:
+`pnpm test` runs 38 tests:
 
-- `src/test/api.test.ts` calls the real route handlers against a migrated in-memory Postgres: sessions, owned and shared listings, every role's allowed and denied actions, revocation, persistence, the 409 conflict path, input validation, and import through the API.
+- `src/test/api.test.ts` calls the real route handlers against a migrated in-memory Postgres: sessions, owned and shared listings, every role's allowed and denied actions, revocation, persistence, the 409 conflict path, input validation, import through the API, and export permissions, headers and formats.
 - `src/lib/access.test.ts` checks the full role and permission matrix.
 - `src/lib/import.test.ts` checks Markdown, plain text and `.docx` conversion, removal of scripts and raw HTML, and rejection of unsupported, corrupt and oversized files, including files that would convert into a document too large to save.
+- `src/lib/export/export.test.ts` checks the exact Markdown output and a lossless export-then-import round trip, multi-page PDFs, emoji, non-Latin scripts, unbreakable words and code blocks, and the download file name header.
 
 ## Project layout
 
@@ -74,6 +76,7 @@ scripts/db-setup.ts      migrate and seed
 src/app/                 pages and API route handlers (src/app/api/**)
 src/components/          editor, toolbar, autosave hook, share dialog, dashboard
 src/db/                  schema, connection (Neon or embedded PGlite), seed users
-src/lib/                 access rules, auth, data access, import, validation
+src/lib/                 access rules, auth, data access, import, export, validation
+assets/fonts/            Noto Sans for PDF export (SIL Open Font License, see OFL.txt)
 src/test/                API tests and test database setup
 ```
